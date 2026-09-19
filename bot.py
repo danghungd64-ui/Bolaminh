@@ -1,6 +1,7 @@
 import os
 import re
 import hashlib
+import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -12,7 +13,7 @@ from telegram.ext import (
 )
 
 # ============================================================
-#   LEMINH TOOL - MD5 GIÚP BẠN LÀM GIÀU THÀNH CÔNG
+#   LEMINH TOOL MD5 - VIP 2026
 # ============================================================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8934734495:AAGVXUK0muIIPK2XYJhzxwHJoaZNbysc-UY")
 ZALO_PHONE = "0372834763"
@@ -39,21 +40,38 @@ def detect_hash_type(h: str):
 
 
 # ============================================================
-#   THUẬT TOÁN NÂNG CAO VIP
+#   THUẬT TOÁN NÂNG CẤP VIP 2026
+#   - Băm 12 vòng SHA-512
+#   - Trộn 4 nguồn entropy: hash + token + salt + vị trí
+#   - Khuếch tán phi tuyến (nonlinear diffusion)
 # ============================================================
 def hash_to_score(h: str) -> int:
     h = h.lower()
-    mixed = f"{h}::{SECRET_TOKEN}".encode()
-    for i in range(9):
-        mixed = hashlib.sha512(mixed + str(i).encode()).digest()
+
+    # Bước 1: Trộn nhiều nguồn
+    salt1 = "LEMINH_VIP_2026"
+    salt2 = f"SEED_{len(h)}"
+    mixed = f"{h}::{SECRET_TOKEN}::{salt1}::{salt2}".encode()
+
+    # Bước 2: Băm 12 vòng (tăng entropy)
+    for i in range(12):
+        mixed = hashlib.sha512(mixed + str(i).encode() + salt1.encode()).digest()
+
+    # Bước 3: Khuếch tán phi tuyến qua nhiều vị trí
     score = 0
-    for i in range(0, len(mixed), 4):
-        chunk = int.from_bytes(mixed[i:i+4], "big")
-        score = (score * 41 + chunk) % 100
+    for i in range(0, len(mixed), 2):
+        chunk = int.from_bytes(mixed[i:i+4], "big") if i + 4 <= len(mixed) else int.from_bytes(mixed[i:] + b"\x00"*(4 - len(mixed[i:])), "big")
+        # Công thức phi tuyến (a*x^2 + b*x + c) mod 100
+        score = (score * 41 + (chunk * chunk) % 9973 + chunk) % 100
+
+    # Bước 4: Bit-mix cuối cùng
+    final_mix = int.from_bytes(hashlib.sha256(mixed).digest()[:8], "big")
+    score = (score * str 73 + final_mix)) % 100
+
     return score
 
 
-def predict(h: str) -> dict:
+def predict(h: -> dict:
     h = h.strip()
     htype = detect_hash_type(h)
     if not htype:
@@ -67,23 +85,26 @@ def predict(h: str) -> dict:
         }
 
     score = hash_to_score(h)
-
-    # ---- Quy tắc độ tin cậy ----
-    # |score - 50| càng lớn -> càng lệch -> tin cậy cao (70–90%)
-    # |score - 50| càng nhỏ -> càng gần 50 -> tin cậy thấp (50–60%)
     distance = abs(score - 50)  # 0..50
 
-    if distance >= 30:
-        # Rất lệch -> tin cậy cao
-        confidence = 85 + (distance - 30)  # 85..100 -> kẹp 90
-        confidence = min(confidence, 90)
+    # ============================================
+    #   QUY TẮC ĐỘ TIN CẬY NÂNG CẤP
+    #   - Càng lệch 50 -> tin cậy càng cao (max 90%)
+    #  :
+ - Càng gần 50  ->        tin cậy càng confidence thấp (min 50 =%)
+    # ========================================= ===
+    if distance >= 35:
+85        confidence = 90                       # cực cao
+    elif distance >= 28 + (distance - 28)     # 85-90
     elif distance >= 20:
-        confidence = 75 + (distance - 20)  # 75..85
-    elif distance >= 10:
-        confidence = 65 + (distance - 10)  # 65..75
+        confidence = 78 + (distance - 20)     # 78-85
+    elif distance >= 12:
+        confidence = 68 + (distance - 12)     # 68-78
+    elif distance >= 6:
+        confidence = 60 + (distance - 6)      # 60-68
     else:
-        # Gần 50 -> tin cậy thấp
-        confidence = 50 + distance  # 50..60
+        confidence = 50 + distance            # 50-56
+
     confidence = max(50, min(confidence, 90))
 
     result = "XỈU" if score < 50 else "TÀI"
@@ -113,15 +134,15 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "• Tin cậy cao → *70% – 90%*\n"
         "• Tin cậy thấp → *50% – 60%*\n\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
-        "🔒 *Lệnh ẩn (chỉ admin):*\n"
+        "🔒 *Lệnh ẩn:*\n"
         "• /hotro – Mở Zalo hỗ trợ\n"
-        "• /xoá – Xoá toàn bộ tin nhắn bot"
+        "• /xoa – Xoá tin nhắn bot"
     )
     await update.message.reply_text(text, parse_mode="Markdown")
 
 
 # ============================================================
-#   /hotro  (ẩn - chỉ hiện khi gõ đúng lệnh)
+#   /hotro
 # ============================================================
 async def cmd_hotro(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = (
@@ -137,10 +158,9 @@ async def cmd_hotro(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # ============================================================
-#   /xoá  (xoá tin nhắn bot)
+#   /xoa
 # ============================================================
 async def cmd_xoa(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    # Xoá tin nhắn lệnh /xoá của user
     try:
         await update.message.delete()
     except Exception:
@@ -151,8 +171,6 @@ async def cmd_xoa(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text="🧹 *Đã xoá!* Gõ /start để bắt đầu lại.",
         parse_mode="Markdown",
     )
-    # Tự xoá sau 3 giây
-    import asyncio
     await asyncio.sleep(3)
     try:
         await msg.delete()
@@ -161,7 +179,7 @@ async def cmd_xoa(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # ============================================================
-#   /32kitu  /64kitu
+#   /32kitu  /64kitu   (KHÔNG dùng dấu tiếng Việt!)
 # ============================================================
 async def cmd_32(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -193,11 +211,11 @@ async def handle_hash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(res["error"], parse_mode="Markdown")
         return
 
-    # Biểu tượng theo kết quả
     emoji = "🔴" if res["result"] == "TÀI" else "🔵"
 
-    # Đánh giá độ tin cậy
-    if res["confidence"] >= 70:
+    if res["confidence"] >= 80:
+        level = "🔥 CỰC CAO"
+    elif res["confidence"] >= 70:
         level = "🔥 CAO"
     elif res["confidence"] >= 60:
         level = "⚡ TRUNG BÌNH"
@@ -231,9 +249,9 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("hotro", cmd_hotro))
-    app.add_handler(CommandHandler("xoa", cmd_xoa))
-    app.add_handler(CommandHandler(["32kitu", "32kí"], cmd_32))
-    app.add_handler(CommandHandler(["64kitu", "64kí"], cmd_64))
+    app.add_handler(CommandHandler("xoa", cmd_xoa))       # ⚠️ KHÔNG dùng "xoá"
+    app.add_handler(CommandHandler("32kitu", cmd_32))     # ⚠️ KHÔNG dùng "32kí"
+    app.add_handler(CommandHandler("64kitu", cmd_64))     # ⚠️ KHÔNG dùng "64kí"
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_hash))
 
     logger.info("🚀 LEMINH TOOL BOT đang chạy...")
